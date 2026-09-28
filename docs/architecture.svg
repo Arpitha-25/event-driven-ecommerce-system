@@ -1,0 +1,236 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/>
+    </marker>
+    <marker id="arrow-grey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <style>
+      .title { font-size: 30px; font-weight: 700; fill: #0f172a; }
+      .subtitle { font-size: 15px; fill: #475569; }
+      .svc-title { font-size: 20px; font-weight: 700; fill: #ffffff; }
+      .comp-title { font-size: 15px; font-weight: 700; fill: #0f172a; }
+      .comp-text { font-size: 12.5px; fill: #334155; }
+      .label { font-size: 12.5px; fill: #334155; }
+      .label-orange { font-size: 12.5px; font-weight: 600; fill: #c2410c; }
+      .topic { font-size: 13.5px; font-family: Consolas, 'Courier New', monospace; fill: #0f172a; }
+      .topic-note { font-size: 11.5px; fill: #64748b; }
+      .small { font-size: 12px; fill: #475569; }
+      .step { font-size: 13px; font-weight: 700; fill: #ffffff; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1100" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="40" y="50" class="title">Event-Driven E-Commerce Platform — Architecture</text>
+  <text x="40" y="76" class="subtitle">Choreography saga over Kafka · Transactional Outbox · idempotent consumers · retries + dead-letter topics · everything in Docker Compose</text>
+
+  <!-- Client -->
+  <rect x="620" y="96" width="360" height="62" rx="10" fill="#f1f5f9" stroke="#334155" stroke-width="1.5"/>
+  <text x="800" y="123" text-anchor="middle" class="comp-title">Client</text>
+  <text x="800" y="143" text-anchor="middle" class="comp-text">REST · Swagger UI · end-to-end test scripts</text>
+
+  <!-- Docker Compose boundary -->
+  <rect x="30" y="185" width="1540" height="805" rx="16" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="8 6"/>
+  <text x="1550" y="984" text-anchor="end" class="small"><tspan font-weight="700">docker compose up</tspan> — one private network; services start only when PostgreSQL and Kafka are healthy</text>
+
+  <!-- ===================== ORDER SERVICE ===================== -->
+  <rect x="60" y="225" width="460" height="420" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+  <rect x="60" y="225" width="460" height="44" rx="12" fill="#2563eb"/>
+  <rect x="60" y="255" width="460" height="14" fill="#2563eb"/>
+  <text x="80" y="254" class="svc-title">Order Service</text>
+  <text x="500" y="254" text-anchor="end" font-size="14" fill="#dbeafe">:8080 · Spring Boot 3 · Java 21</text>
+
+  <rect x="80" y="285" width="420" height="52" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="95" y="306" class="comp-title">REST API  /api/v1/orders</text>
+  <text x="95" y="326" class="comp-text">create · get · update · cancel — validation, correlation ID filter</text>
+
+  <rect x="80" y="349" width="420" height="58" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="95" y="371" class="comp-title">OrderService  (@Transactional)</text>
+  <text x="95" y="391" class="comp-text">saves the order <tspan font-weight="700">and</tspan> its event row in one DB transaction</text>
+
+  <rect x="80" y="419" width="420" height="72" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="95" y="441" class="comp-title">Transactional Outbox → OutboxRelay</text>
+  <text x="95" y="461" class="comp-text">every 1 s: oldest unpublished rows, FOR UPDATE SKIP LOCKED,</text>
+  <text x="95" y="478" class="comp-text">send in order, mark published only after Kafka acks</text>
+
+  <rect x="80" y="503" width="420" height="72" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="95" y="525" class="comp-title">InventoryEventListener → Handler</text>
+  <text x="95" y="545" class="comp-text">skip duplicate eventIds (processed_events, same transaction)</text>
+  <text x="95" y="562" class="comp-text">CREATED → CONFIRMED  or  REJECTED + reason</text>
+
+  <text x="80" y="615" class="small">order statuses: CREATED · CONFIRMED · REJECTED · CANCELLED …</text>
+
+  <!-- ===================== PRODUCT SERVICE ===================== -->
+  <rect x="620" y="225" width="360" height="110" rx="12" fill="#faf5ff" stroke="#7c3aed" stroke-width="2"/>
+  <rect x="620" y="225" width="360" height="40" rx="12" fill="#7c3aed"/>
+  <rect x="620" y="251" width="360" height="14" fill="#7c3aed"/>
+  <text x="638" y="252" class="svc-title">Product Service</text>
+  <text x="962" y="252" text-anchor="end" font-size="14" fill="#ede9fe">:8082</text>
+  <text x="638" y="290" class="comp-text">REST API  /api/v1/products  — product catalog</text>
+  <text x="638" y="310" class="comp-text">publishes product events (catalog notifications)</text>
+
+  <!-- ===================== KAFKA ===================== -->
+  <rect x="600" y="375" width="400" height="390" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+  <rect x="600" y="375" width="400" height="44" rx="12" fill="#ea580c"/>
+  <rect x="600" y="405" width="400" height="14" fill="#ea580c"/>
+  <text x="620" y="404" class="svc-title">Apache Kafka 3.8</text>
+  <text x="982" y="404" text-anchor="end" font-size="14" fill="#ffedd5">KRaft · 3 partitions / topic</text>
+
+  <rect x="625" y="437" width="350" height="30" rx="15" fill="#ffffff" stroke="#fdba74"/>
+  <text x="640" y="457" class="topic">order.created.v1</text>
+  <rect x="625" y="475" width="350" height="30" rx="15" fill="#ffffff" stroke="#fdba74"/>
+  <text x="640" y="495" class="topic">order.cancelled.v1</text>
+  <rect x="625" y="513" width="350" height="30" rx="15" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="640" y="533" class="topic" fill="#64748b">order.updated.v1</text>
+  <text x="960" y="533" text-anchor="end" class="topic-note">no consumer yet</text>
+
+  <rect x="625" y="561" width="350" height="30" rx="15" fill="#ffffff" stroke="#fdba74"/>
+  <text x="640" y="581" class="topic">inventory.reserved.v1</text>
+  <rect x="625" y="599" width="350" height="30" rx="15" fill="#ffffff" stroke="#fdba74"/>
+  <text x="640" y="619" class="topic">inventory.reservation-failed.v1</text>
+
+  <rect x="625" y="647" width="350" height="30" rx="15" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="640" y="667" class="topic" fill="#64748b">product.{created,updated,deleted}.v1</text>
+
+  <rect x="625" y="695" width="350" height="50" rx="10" fill="#fee2e2" stroke="#f87171"/>
+  <text x="640" y="716" class="topic">&lt;topic&gt;.DLT</text>
+  <text x="640" y="735" class="topic-note">after 3 retries (1 s · 2 s · 4 s) or unreadable JSON</text>
+
+  <!-- ===================== INVENTORY SERVICE ===================== -->
+  <rect x="1080" y="225" width="460" height="420" rx="12" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+  <rect x="1080" y="225" width="460" height="44" rx="12" fill="#16a34a"/>
+  <rect x="1080" y="255" width="460" height="14" fill="#16a34a"/>
+  <text x="1100" y="254" class="svc-title">Inventory Service</text>
+  <text x="1520" y="254" text-anchor="end" font-size="14" fill="#dcfce7">:8083 · Spring Boot 3 · Java 21</text>
+
+  <rect x="1100" y="285" width="420" height="52" rx="8" fill="#ffffff" stroke="#86efac"/>
+  <text x="1115" y="306" class="comp-title">REST API  /api/v1/inventory</text>
+  <text x="1115" y="326" class="comp-text">stock per product: total · reserved · available · status</text>
+
+  <rect x="1100" y="419" width="420" height="72" rx="8" fill="#ffffff" stroke="#86efac"/>
+  <text x="1115" y="441" class="comp-title">OrderEventListener → Handler</text>
+  <text x="1115" y="461" class="comp-text">duplicate eventId: never touches stock, re-sends stored</text>
+  <text x="1115" y="478" class="comp-text">outcome (processed_events, same transaction)</text>
+
+  <rect x="1100" y="503" width="420" height="52" rx="8" fill="#ffffff" stroke="#86efac"/>
+  <text x="1115" y="524" class="comp-title">StockReservationService</text>
+  <text x="1115" y="543" class="comp-text">SELECT … FOR UPDATE (no overselling) · one reservation per order</text>
+
+  <rect x="1100" y="567" width="420" height="52" rx="8" fill="#ffffff" stroke="#86efac"/>
+  <text x="1115" y="588" class="comp-title">InventoryEventPublisher</text>
+  <text x="1115" y="607" class="comp-text">sends the reply only after the reservation commits</text>
+
+  <!-- Kafka UI -->
+  <rect x="1180" y="690" width="260" height="56" rx="10" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="1310" y="714" text-anchor="middle" class="comp-title">Kafka UI  :8081</text>
+  <text x="1310" y="733" text-anchor="middle" class="comp-text">browse topics, messages, DLTs</text>
+  <line x1="1178" y1="718" x2="1004" y2="718" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow-grey)"/>
+
+  <!-- ===================== POSTGRES ===================== -->
+  <rect x="60" y="800" width="1480" height="170" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="2"/>
+  <text x="760" y="835" class="comp-title" font-size="18">PostgreSQL 16</text>
+  <text x="760" y="858" class="comp-text">one container · one database per service</text>
+  <text x="760" y="878" class="comp-text">(created by docker/postgres/init.sql)</text>
+
+  <!-- orderdb cylinder -->
+  <g>
+    <path d="M200,830 v70 a90,14 0 0 0 180,0 v-70" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+    <ellipse cx="290" cy="830" rx="90" ry="14" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+    <text x="290" y="868" text-anchor="middle" class="comp-title">orderdb</text>
+    <text x="290" y="940" text-anchor="middle" class="small">orders · outbox_events</text>
+    <text x="290" y="956" text-anchor="middle" class="small">processed_events · audit_events</text>
+  </g>
+  <!-- product db cylinder -->
+  <g>
+    <path d="M470,830 v70 a90,14 0 0 0 180,0 v-70" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+    <ellipse cx="560" cy="830" rx="90" ry="14" fill="#faf5ff" stroke="#7c3aed" stroke-width="1.5"/>
+    <text x="560" y="866" text-anchor="middle" class="comp-title" font-size="13">ecommerce_</text>
+    <text x="560" y="883" text-anchor="middle" class="comp-title" font-size="13">product_db</text>
+    <text x="560" y="940" text-anchor="middle" class="small">products</text>
+  </g>
+  <!-- inventory db cylinder -->
+  <g>
+    <path d="M1220,830 v70 a90,14 0 0 0 180,0 v-70" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+    <ellipse cx="1310" cy="830" rx="90" ry="14" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+    <text x="1310" y="866" text-anchor="middle" class="comp-title" font-size="13">ecommerce_</text>
+    <text x="1310" y="883" text-anchor="middle" class="comp-title" font-size="13">inventory_db</text>
+    <text x="1310" y="940" text-anchor="middle" class="small">inventories · stock_reservations</text>
+    <text x="1310" y="956" text-anchor="middle" class="small">processed_events</text>
+  </g>
+
+  <!-- ===================== ARROWS ===================== -->
+  <!-- Client -> services (HTTP) -->
+  <path d="M650,158 C560,185 380,190 300,222" fill="none" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow-dark)"/>
+  <text x="430" y="172" class="label">HTTP :8080</text>
+  <line x1="800" y1="158" x2="800" y2="222" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow-dark)"/>
+  <text x="808" y="196" class="label">HTTP :8082</text>
+  <path d="M950,158 C1040,185 1220,190 1300,222" fill="none" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow-dark)"/>
+  <text x="1105" y="172" class="label">HTTP :8083</text>
+
+  <!-- Product -> Kafka -->
+  <line x1="800" y1="335" x2="800" y2="372" stroke="#ea580c" stroke-width="2" marker-end="url(#arrow-orange)"/>
+
+  <!-- Order OutboxRelay -> order.* topics -->
+  <path d="M500,455 L560,455 L560,466 L622,466" fill="none" stroke="#ea580c" stroke-width="2.2" marker-end="url(#arrow-orange)"/>
+  <circle cx="545" cy="438" r="12" fill="#ea580c"/>
+  <text x="545" y="443" text-anchor="middle" class="step">2</text>
+
+  <!-- inventory.* topics -> Order listener -->
+  <path d="M622,596 L575,596 L575,540 L503,540" fill="none" stroke="#ea580c" stroke-width="2.2" marker-end="url(#arrow-orange)"/>
+  <circle cx="548" cy="568" r="12" fill="#ea580c"/>
+  <text x="548" y="573" text-anchor="middle" class="step">5</text>
+
+  <!-- order.* topics -> Inventory listener -->
+  <path d="M978,466 L1040,466 L1040,455 L1097,455" fill="none" stroke="#ea580c" stroke-width="2.2" marker-end="url(#arrow-orange)"/>
+  <circle cx="1060" cy="438" r="12" fill="#ea580c"/>
+  <text x="1060" y="443" text-anchor="middle" class="step">3</text>
+
+  <!-- Inventory publisher -> inventory.* topics -->
+  <path d="M1100,593 L978,593" fill="none" stroke="#ea580c" stroke-width="2.2" marker-end="url(#arrow-orange)"/>
+  <circle cx="1040" cy="614" r="12" fill="#ea580c"/>
+  <text x="1040" y="619" text-anchor="middle" class="step">4</text>
+
+  <!-- Inventory internal flow -->
+  <line x1="1310" y1="491" x2="1310" y2="501" stroke="#16a34a" stroke-width="1.5"/>
+  <line x1="1310" y1="555" x2="1310" y2="565" stroke="#16a34a" stroke-width="1.5"/>
+
+  <!-- Order step 1 badge -->
+  <circle cx="480" cy="378" r="12" fill="#2563eb"/>
+  <text x="480" y="383" text-anchor="middle" class="step">1</text>
+
+  <!-- JDBC links (dashed) -->
+  <line x1="290" y1="645" x2="290" y2="814" stroke="#475569" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#arrow-grey)"/>
+  <text x="298" y="740" class="label">JDBC</text>
+  <path d="M620,300 L585,300 L585,690 L560,700 L560,814" fill="none" stroke="#475569" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#arrow-grey)"/>
+  <text x="530" y="760" class="label">JDBC</text>
+  <line x1="1480" y1="645" x2="1480" y2="814" stroke="#475569" stroke-width="1.6" stroke-dasharray="6 5"/>
+  <path d="M1480,814 L1480,820 L1402,840" fill="none" stroke="#475569" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#arrow-grey)"/>
+  <text x="1488" y="740" class="label">JDBC</text>
+
+  <!-- ===================== FOOTER: SAGA STEPS + LEGEND ===================== -->
+  <text x="40" y="1022" class="comp-title">Order saga</text>
+  <circle cx="52" cy="1044" r="10" fill="#2563eb"/><text x="52" y="1048" text-anchor="middle" class="step" font-size="11">1</text>
+  <text x="68" y="1049" class="label">order + outbox row saved together</text>
+  <circle cx="290" cy="1044" r="10" fill="#ea580c"/><text x="290" y="1048" text-anchor="middle" class="step" font-size="11">2</text>
+  <text x="306" y="1049" class="label">relay publishes OrderCreated / OrderCancelled</text>
+  <circle cx="610" cy="1044" r="10" fill="#ea580c"/><text x="610" y="1048" text-anchor="middle" class="step" font-size="11">3</text>
+  <text x="626" y="1049" class="label">inventory reserves (or releases) stock</text>
+  <circle cx="885" cy="1044" r="10" fill="#ea580c"/><text x="885" y="1048" text-anchor="middle" class="step" font-size="11">4</text>
+  <text x="901" y="1049" class="label">replies reserved / reservation-failed</text>
+  <circle cx="1150" cy="1044" r="10" fill="#ea580c"/><text x="1150" y="1048" text-anchor="middle" class="step" font-size="11">5</text>
+  <text x="1166" y="1049" class="label">order → CONFIRMED / REJECTED</text>
+
+  <line x1="40" y1="1078" x2="80" y2="1078" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow-dark)"/>
+  <text x="88" y="1082" class="label">HTTP</text>
+  <line x1="150" y1="1078" x2="190" y2="1078" stroke="#ea580c" stroke-width="2.2" marker-end="url(#arrow-orange)"/>
+  <text x="198" y="1082" class="label">Kafka event</text>
+  <line x1="300" y1="1078" x2="340" y2="1078" stroke="#475569" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#arrow-grey)"/>
+  <text x="348" y="1082" class="label">JDBC</text>
+  <text x="430" y="1082" class="small"><tspan font-weight="700">common-module</tspan> (shared library in every service): ApiResponse · BaseEvent · EventMetadataFactory · CorrelationIdFilter · TimeZoneNormalizer</text>
+</svg>
