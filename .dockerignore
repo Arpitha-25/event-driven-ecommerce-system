@@ -1,0 +1,12 @@
+# The service images are built from the repository root (they need the parent POM and
+# common-module). Keep the build context small: only POMs and sources are needed.
+**/target
+.idea
+.vscode
+.git
+docs
+scripts
+docker
+**/*.md
+**/screenshots
+**/*.log
