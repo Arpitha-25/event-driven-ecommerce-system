@@ -35,6 +35,15 @@
         <module>inventory-service</module>
     </modules>
 
+    <profiles>
+        <!-- Whole-system tests in Docker (builds the service images): mvn install -Psystem-tests -->
+        <profile>
+            <id>system-tests</id>
+            <modules>
+                <module>system-tests</module>
+            </modules>
+        </profile>
+    </profiles>
 
     <build>
         <plugins>
