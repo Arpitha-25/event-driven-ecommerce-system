@@ -2,6 +2,7 @@
 
 > An event-driven microservices backend built with **Java 21, Spring Boot 3, Apache Kafka, PostgreSQL and Docker**.
 
+[![CI](https://github.com/Arpitha-25/event-driven-ecommerce-system/actions/workflows/ci.yml/badge.svg)](https://github.com/Arpitha-25/event-driven-ecommerce-system/actions/workflows/ci.yml)
 ![Java](https://img.shields.io/badge/Java-21-orange)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-brightgreen)
 ![Apache Kafka](https://img.shields.io/badge/Apache-Kafka-black)
@@ -19,6 +20,8 @@ The platform is split into independent services, each with its own PostgreSQL da
 - [docs/TRANSACTIONAL-OUTBOX.md](docs/TRANSACTIONAL-OUTBOX.md): reliable event publishing from order-service
 - [docs/RELIABLE-CONSUMERS.md](docs/RELIABLE-CONSUMERS.md): idempotent consumers, retries and dead-letter topics
 - [docs/DOCKER-AND-SYSTEM-TESTS.md](docs/DOCKER-AND-SYSTEM-TESTS.md): running everything in Docker, and the full-flow system test
+- [docs/DATABASE-MIGRATIONS.md](docs/DATABASE-MIGRATIONS.md): Flyway schema migrations
+- [docs/CI.md](docs/CI.md): the GitHub Actions pipeline
 
 ---
 
@@ -122,6 +125,8 @@ Every consumer records the event IDs it has handled (`processed_events`), so a r
 - Correlation ID carried from the HTTP request through every saga event
 - OpenAPI / Swagger documentation
 - Spring Boot Actuator health, info and metrics
+- Database schemas versioned with Flyway; Hibernate only validates (`ddl-auto: validate`), so a mismatch stops startup
+- CI on GitHub Actions: build, unit and integration tests, then the Docker system test, on every push and pull request
 - Unit tests with JUnit 5 and Mockito
 - Integration tests on real PostgreSQL and Kafka (Testcontainers): concurrent duplicate events, racing orders for the last units, and a lost reply redelivered by Kafka
 - End-to-end test scripts run against the real Kafka and PostgreSQL stack, including a Kafka outage test
@@ -136,11 +141,11 @@ Every consumer records the event IDs it has handled (`processed_events`), so a r
 |------|-------|
 | Language & framework | Java 21, Spring Boot 3.3 (Web, Data JPA, Validation, Actuator) |
 | Messaging | Apache Kafka 3.8, Spring Kafka, Kafka UI |
-| Database | PostgreSQL 16 |
+| Database | PostgreSQL 16, Flyway migrations |
 | Mapping & boilerplate | MapStruct, Lombok |
 | API docs | springdoc-openapi (Swagger UI) |
 | Testing | JUnit 5, Mockito, Spring Boot Test, Testcontainers (PostgreSQL, Kafka) |
-| Build & run | Maven, Docker (multi-stage images), Docker Compose |
+| Build & run | Maven, Docker (multi-stage images), Docker Compose, GitHub Actions |
 
 ---
 
@@ -155,8 +160,7 @@ event-driven-ecommerce-system
 ├── system-tests          # full-flow test in Docker (Maven profile: -Psystem-tests)
 ├── docker
 │   └── postgres
-│       ├── init.sql      # creates the three service databases
-│       └── migrations    # one-off fixes for databases created by older versions
+│       └── init.sql      # creates the three service databases (each service's tables come from Flyway)
 ├── docs                  # design, test results and how-tos for each feature
 ├── scripts               # end-to-end tests: saga, reliable consumers, Kafka outage
 ├── docker-compose.yml    # the whole system: PostgreSQL, Kafka, Kafka UI and the three services
@@ -209,6 +213,8 @@ mvn clean install                               # unit + integration tests (real
 mvn install -Psystem-tests                      # also the full-flow system test: builds the images and runs them in Docker
 ```
 
+GitHub Actions runs both on every push to `main` and on every pull request (see [docs/CI.md](docs/CI.md)).
+
 End-to-end scripts, run against a running system (Option A or B):
 
 ```powershell
@@ -216,9 +222,6 @@ powershell -ExecutionPolicy Bypass -File scripts\test-order-saga.ps1
 powershell -ExecutionPolicy Bypass -File scripts\test-reliable-consumers.ps1
 powershell -ExecutionPolicy Bypass -File scripts\test-outbox-kafka-outage.ps1   # stops Kafka for about a minute
 ```
-
-> If your `orderdb` was created before the saga was added, run
-> `docker/postgres/migrations/001-order-status-saga.sql` once. See the saga doc for details.
 
 Services connect to `localhost` with `postgres` / `postgres` credentials by default. Override them with
 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`

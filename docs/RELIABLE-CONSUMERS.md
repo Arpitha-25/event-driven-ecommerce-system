@@ -134,7 +134,7 @@ attempt 1 ── fails ── wait 1 s ── attempt 2 ── fails ── wait
 | `order-service/pom.xml`, `inventory-service/pom.xml` | Test-scope dependencies: `spring-boot-testcontainers`, `testcontainers` `junit-jupiter`, `postgresql`, and `kafka` (inventory only) |
 
 ### Database
-Both `processed_events` tables are created by Hibernate on first start. No migration is needed. After the first start, both databases were checked for the unique constraint that `ON CONFLICT` depends on:
+Both `processed_events` tables were created by Hibernate on first start (the schema is now managed by Flyway; see [DATABASE-MIGRATIONS.md](DATABASE-MIGRATIONS.md)). After the first start, both databases were checked for the unique constraint that `ON CONFLICT` depends on:
 ```text
 orderdb                | uk_processed_events_consumer_event | UNIQUE (consumer, event_id)
 ecommerce_inventory_db | uk_processed_events_consumer_event | UNIQUE (consumer, event_id)

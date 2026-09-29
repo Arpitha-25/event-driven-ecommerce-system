@@ -118,7 +118,7 @@ An order is rejected when the product has no inventory record, the product is di
 | File | Purpose |
 |------|---------|
 | `scripts/test-order-saga.ps1` | End-to-end test (see below) |
-| `docker/postgres/migrations/001-order-status-saga.sql` | One-time fix for an `orderdb` created before this change (see below) |
+| `docker/postgres/migrations/001-order-status-saga.sql` | One-time fix for an `orderdb` created before this change (see below). *Since removed: the schema is now managed by Flyway, whose `V1` already contains the full status list.* |
 
 ### ⚠️ Breaking API change
 `POST /api/v1/orders` now **requires `productId`**, the UUID of a product that has inventory:
@@ -159,7 +159,7 @@ Order 996908228 already handled (reservation CANCELLED), replaying its outcome
 ```
 
 ### Problems found by running it (not visible from the code)
-1. **Existing `orderdb` rejected the new statuses.** Hibernate 6 adds a CHECK constraint that lists the enum values. `ddl-auto: update` never updates an existing constraint, so a database created before this change rejects `CONFIRMED` and `REJECTED`. On the first test run, orders stayed `CREATED`, and the retry and dead-letter handling moved those replies to the `.DLT` topics as designed. Fixed with `docker/postgres/migrations/001-order-status-saga.sql`. A brand-new database was also checked: Hibernate creates it with all seven statuses, so it doesn't need the migration.
+1. **Existing `orderdb` rejected the new statuses.** Hibernate 6 adds a CHECK constraint that lists the enum values. `ddl-auto: update` never updates an existing constraint, so a database created before this change rejects `CONFIRMED` and `REJECTED`. On the first test run, orders stayed `CREATED`, and the retry and dead-letter handling moved those replies to the `.DLT` topics as designed. Fixed at the time with a one-off SQL script. A brand-new database was also checked: Hibernate created it with all seven statuses. This problem is why the schema is now managed by **Flyway** with `ddl-auto: validate`: a schema change now needs an explicit migration, and a mismatch stops the service at startup instead of failing later at runtime (see [DATABASE-MIGRATIONS.md](DATABASE-MIGRATIONS.md)).
 2. **A real race condition during startup.** Kafka still held old order events from before this change. A created event and a cancelled event for the same old order were processed at the same moment and both tried to insert its reservation row. The unique constraint blocked the second insert, the error handler retried it one second later, and the retry saw the existing row. Nothing was double-counted and nothing went to the DLT.
 3. **Old events without `productId`** were rejected cleanly with "Order has no valid product ID or quantity" and didn't crash the consumer.
 
@@ -171,17 +171,14 @@ Order 996908228 already handled (reservation CANCELLED), replaying its outcome
 # 1. Infrastructure
 docker compose up -d
 
-# 2. Only if your orderdb existed before this change (safe to run more than once)
-Get-Content docker\postgres\migrations\001-order-status-saga.sql | docker exec -i ecommerce-postgres psql -U postgres -d orderdb
-
-# 3. Build and run the unit tests
+# 2. Build and run the tests (the services create their schema with Flyway on first start)
 mvn clean install
 
-# 4. Start the services (separate terminals)
+# 3. Start the services (separate terminals)
 java -jar order-service\target\order-service-0.0.1-SNAPSHOT.jar
 java -jar inventory-service\target\inventory-service-0.0.1-SNAPSHOT.jar
 
-# 5. End-to-end test
+# 4. End-to-end test
 powershell -ExecutionPolicy Bypass -File scripts\test-order-saga.ps1
 ```
 

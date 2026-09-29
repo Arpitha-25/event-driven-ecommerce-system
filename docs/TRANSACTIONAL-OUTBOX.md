@@ -84,7 +84,7 @@ app:
 | `scripts/test-outbox-kafka-outage.ps1` | End to end against the real stack (see below). |
 
 ### Database
-`outbox_events` is created automatically by Hibernate (`ddl-auto: update`) on the first start. No migration is needed.
+`outbox_events` is part of order-service's Flyway migration `V1__initial_schema.sql`, together with its `(published_at, id)` index. See [DATABASE-MIGRATIONS.md](DATABASE-MIGRATIONS.md).
 
 ---
 
