@@ -1,0 +1,45 @@
+server:
+  port: 8000
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 2000
+        response-timeout: 15s
+      routes:
+        - id: identity-service
+          uri: ${IDENTITY_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: order-service
+          uri: ${ORDER_SERVICE_URL:http://localhost:8080}
+          predicates:
+            - Path=/api/v1/orders/**
+        - id: product-service
+          uri: ${PRODUCT_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/products/**
+        - id: inventory-service
+          uri: ${INVENTORY_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/inventory/**
+
+app:
+  security:
+    jwt:
+      # Public keys used to verify access tokens, published by identity-service.
+      jwk-set-uri: ${IDENTITY_SERVICE_URL:http://localhost:8084}/.well-known/jwks.json
+      # Must match identity-service's app.jwt.issuer.
+      issuer: ${JWT_ISSUER:ecommerce-identity-service}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: always

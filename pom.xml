@@ -34,7 +34,21 @@
         <module>product-service</module>
         <module>inventory-service</module>
         <module>identity-service</module>
+        <module>api-gateway</module>
     </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring Cloud release train matching Spring Boot 3.3 (used by api-gateway) -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <profiles>
         <!-- Whole-system tests in Docker (builds the service images): mvn install -Psystem-tests -->
