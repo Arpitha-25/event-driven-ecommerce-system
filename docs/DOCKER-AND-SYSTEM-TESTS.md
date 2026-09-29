@@ -69,6 +69,8 @@ The old `order-service/Dockerfile` copied a jar from the local `target/` into a 
 
 ## 2. The full-flow system test
 
+> **Update:** the containers now live in a shared `SystemEnvironment` class that starts PostgreSQL, Kafka and all **five** images (including api-gateway and identity-service) once, for both `OrderFlowSystemTest` and the newer `GatewaySystemTest` (see [GATEWAY-AND-AUTH.md](GATEWAY-AND-AUTH.md)).
+
 **`system-tests/src/test/java/com/arpitha/systemtests/OrderFlowSystemTest.java`**
 
 ```text

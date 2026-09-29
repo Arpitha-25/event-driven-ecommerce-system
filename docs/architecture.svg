@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100" font-family="Segoe UI, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1240" viewBox="0 0 1600 1240" font-family="Segoe UI, Arial, sans-serif">
   <defs>
     <marker id="arrow-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
@@ -8,6 +8,9 @@
     </marker>
     <marker id="arrow-grey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <marker id="arrow-pink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#db2777"/>
     </marker>
     <style>
       .title { font-size: 30px; font-weight: 700; fill: #0f172a; }
@@ -24,20 +27,58 @@
     </style>
   </defs>
 
-  <rect width="1600" height="1100" fill="#ffffff"/>
+  <rect width="1600" height="1240" fill="#ffffff"/>
 
   <!-- Title -->
   <text x="40" y="50" class="title">Event-Driven E-Commerce Platform — Architecture</text>
-  <text x="40" y="76" class="subtitle">Choreography saga over Kafka · Transactional Outbox · idempotent consumers · retries + dead-letter topics · everything in Docker Compose</text>
+  <text x="40" y="76" class="subtitle">API gateway with JWT auth · choreography saga over Kafka · Transactional Outbox · idempotent consumers · retries + DLTs · Docker Compose</text>
 
   <!-- Client -->
   <rect x="620" y="96" width="360" height="62" rx="10" fill="#f1f5f9" stroke="#334155" stroke-width="1.5"/>
   <text x="800" y="123" text-anchor="middle" class="comp-title">Client</text>
-  <text x="800" y="143" text-anchor="middle" class="comp-text">REST · Swagger UI · end-to-end test scripts</text>
+  <text x="800" y="143" text-anchor="middle" class="comp-text">one entry point: http://localhost:8000</text>
 
   <!-- Docker Compose boundary -->
-  <rect x="30" y="185" width="1540" height="805" rx="16" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="8 6"/>
-  <text x="1550" y="984" text-anchor="end" class="small"><tspan font-weight="700">docker compose up</tspan> — one private network; services start only when PostgreSQL and Kafka are healthy</text>
+  <rect x="30" y="185" width="1540" height="945" rx="16" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="8 6"/>
+  <text x="1550" y="1124" text-anchor="end" class="small"><tspan font-weight="700">docker compose up</tspan> — one private network; services start only when PostgreSQL and Kafka are healthy</text>
+
+  <!-- Client -> gateway -->
+  <line x1="800" y1="158" x2="800" y2="207" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow-dark)"/>
+  <text x="810" y="178" class="label">HTTP · Authorization: Bearer &lt;JWT&gt;</text>
+
+  <!-- ===================== ACCESS RULES ===================== -->
+  <rect x="60" y="210" width="440" height="105" rx="12" fill="#ffffff" stroke="#94a3b8" stroke-dasharray="4 3"/>
+  <text x="78" y="236" class="comp-title">Access rules (enforced at the gateway)</text>
+  <text x="78" y="258" class="comp-text"><tspan font-weight="700">anyone:</tspan> register · log in · browse products</text>
+  <text x="78" y="277" class="comp-text"><tspan font-weight="700">USER:</tspan> place and view orders · view stock</text>
+  <text x="78" y="296" class="comp-text"><tspan font-weight="700">ADMIN:</tspan> also create and change products and stock</text>
+
+  <!-- ===================== API GATEWAY ===================== -->
+  <rect x="560" y="210" width="480" height="105" rx="12" fill="#ecfeff" stroke="#0891b2" stroke-width="2"/>
+  <rect x="560" y="210" width="480" height="40" rx="12" fill="#0891b2"/>
+  <rect x="560" y="236" width="480" height="14" fill="#0891b2"/>
+  <text x="578" y="237" class="svc-title">API Gateway</text>
+  <text x="1022" y="237" text-anchor="end" font-size="14" fill="#cffafe">:8000 · Spring Cloud Gateway</text>
+  <text x="578" y="272" class="comp-text">verifies the JWT: RS256 signature (JWKS) · expiry · issuer · roles</text>
+  <text x="578" y="292" class="comp-text">strips client X-User-* · adds X-User-Id / Roles · X-Correlation-ID</text>
+
+  <!-- ===================== IDENTITY SERVICE ===================== -->
+  <rect x="1120" y="210" width="420" height="105" rx="12" fill="#fdf2f8" stroke="#db2777" stroke-width="2"/>
+  <rect x="1120" y="210" width="420" height="40" rx="12" fill="#db2777"/>
+  <rect x="1120" y="236" width="420" height="14" fill="#db2777"/>
+  <text x="1138" y="237" class="svc-title">Identity Service</text>
+  <text x="1522" y="237" text-anchor="end" font-size="14" fill="#fce7f3">:8084</text>
+  <text x="1138" y="272" class="comp-text">register · log in → access token (JWT, RS256, 60 min)</text>
+  <text x="1138" y="292" class="comp-text">BCrypt passwords · public key at /.well-known/jwks.json</text>
+
+  <!-- gateway <-> identity -->
+  <line x1="1040" y1="250" x2="1117" y2="250" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow-dark)"/>
+  <text x="1047" y="243" class="label">/auth/**</text>
+  <line x1="1118" y1="292" x2="1043" y2="292" stroke="#db2777" stroke-width="1.8" stroke-dasharray="4 3" marker-end="url(#arrow-pink)"/>
+  <text x="1058" y="285" class="label">JWKS</text>
+
+  <!-- Everything below the gateway row, moved down to make room for it -->
+  <g transform="translate(0,130)">
 
   <!-- ===================== ORDER SERVICE ===================== -->
   <rect x="60" y="225" width="460" height="420" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
@@ -134,9 +175,18 @@
 
   <!-- ===================== POSTGRES ===================== -->
   <rect x="60" y="800" width="1480" height="170" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="2"/>
-  <text x="760" y="835" class="comp-title" font-size="18">PostgreSQL 16</text>
-  <text x="760" y="858" class="comp-text">one container · one database per service</text>
-  <text x="760" y="878" class="comp-text">(created by docker/postgres/init.sql)</text>
+  <text x="690" y="835" class="comp-title" font-size="18">PostgreSQL 16</text>
+  <text x="690" y="858" class="comp-text">one container · one database per service</text>
+  <text x="690" y="878" class="comp-text">databases: init.sql · tables: Flyway</text>
+
+  <!-- identity db cylinder -->
+  <g>
+    <path d="M950,830 v70 a90,14 0 0 0 180,0 v-70" fill="#fce7f3" stroke="#db2777" stroke-width="1.5"/>
+    <ellipse cx="1040" cy="830" rx="90" ry="14" fill="#fdf2f8" stroke="#db2777" stroke-width="1.5"/>
+    <text x="1040" y="866" text-anchor="middle" class="comp-title" font-size="13">ecommerce_</text>
+    <text x="1040" y="883" text-anchor="middle" class="comp-title" font-size="13">identity_db</text>
+    <text x="1040" y="940" text-anchor="middle" class="small">users (identity-service)</text>
+  </g>
 
   <!-- orderdb cylinder -->
   <g>
@@ -165,13 +215,13 @@
   </g>
 
   <!-- ===================== ARROWS ===================== -->
-  <!-- Client -> services (HTTP) -->
-  <path d="M650,158 C560,185 380,190 300,222" fill="none" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow-dark)"/>
-  <text x="430" y="172" class="label">HTTP :8080</text>
-  <line x1="800" y1="158" x2="800" y2="222" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow-dark)"/>
-  <text x="808" y="196" class="label">HTTP :8082</text>
-  <path d="M950,158 C1040,185 1220,190 1300,222" fill="none" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow-dark)"/>
-  <text x="1105" y="172" class="label">HTTP :8083</text>
+  <!-- Gateway -> services (HTTP, verified user headers) -->
+  <path d="M640,185 C560,200 380,205 300,222" fill="none" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow-dark)"/>
+  <text x="400" y="200" class="label">/orders/**</text>
+  <line x1="800" y1="185" x2="800" y2="222" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow-dark)"/>
+  <text x="808" y="208" class="label">/products/**</text>
+  <path d="M960,185 C1040,200 1220,205 1300,222" fill="none" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow-dark)"/>
+  <text x="1120" y="200" class="label">/inventory/**</text>
 
   <!-- Product -> Kafka -->
   <line x1="800" y1="335" x2="800" y2="372" stroke="#ea580c" stroke-width="2" marker-end="url(#arrow-orange)"/>
@@ -213,7 +263,10 @@
   <path d="M1480,814 L1480,820 L1402,840" fill="none" stroke="#475569" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#arrow-grey)"/>
   <text x="1488" y="740" class="label">JDBC</text>
 
+  </g>
+
   <!-- ===================== FOOTER: SAGA STEPS + LEGEND ===================== -->
+  <g transform="translate(0,140)">
   <text x="40" y="1022" class="comp-title">Order saga</text>
   <circle cx="52" cy="1044" r="10" fill="#2563eb"/><text x="52" y="1048" text-anchor="middle" class="step" font-size="11">1</text>
   <text x="68" y="1049" class="label">order + outbox row saved together</text>
@@ -232,5 +285,8 @@
   <text x="198" y="1082" class="label">Kafka event</text>
   <line x1="300" y1="1078" x2="340" y2="1078" stroke="#475569" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#arrow-grey)"/>
   <text x="348" y="1082" class="label">JDBC</text>
-  <text x="430" y="1082" class="small"><tspan font-weight="700">common-module</tspan> (shared library in every service): ApiResponse · BaseEvent · EventMetadataFactory · CorrelationIdFilter · TimeZoneNormalizer</text>
+  <line x1="410" y1="1078" x2="450" y2="1078" stroke="#db2777" stroke-width="1.8" stroke-dasharray="4 3" marker-end="url(#arrow-pink)"/>
+  <text x="458" y="1082" class="label">public keys</text>
+  <text x="560" y="1082" class="small"><tspan font-weight="700">common-module</tspan> (shared by the services): ApiResponse · BaseEvent · EventMetadataFactory · CorrelationIdFilter · TimeZoneNormalizer</text>
+  </g>
 </svg>
