@@ -68,6 +68,14 @@
             <artifactId>kafka</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Only to forge tokens the gateway must reject -->
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <!-- Same version Spring Security uses in api-gateway and identity-service -->
+            <version>9.37.3</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -92,6 +100,9 @@
                                 <argument>build</argument>
                                 <argument>order-service</argument>
                                 <argument>inventory-service</argument>
+                                <argument>product-service</argument>
+                                <argument>identity-service</argument>
+                                <argument>api-gateway</argument>
                             </arguments>
                         </configuration>
                     </execution>

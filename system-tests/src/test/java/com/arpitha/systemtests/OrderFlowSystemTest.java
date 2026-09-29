@@ -1,6 +1,5 @@
 package com.arpitha.systemtests;
 
-import com.arpitha.common.util.TimeZoneNormalizer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -10,22 +9,15 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.Network;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.KafkaContainer;
-import org.testcontainers.utility.DockerImageName;
-import org.testcontainers.utility.MountableFile;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -40,61 +32,21 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * The whole order -> inventory -> order-status flow, tested as a black box.
  *
- * PostgreSQL, Kafka, order-service and inventory-service all run in Docker on a private
- * network. The service containers use the same images docker-compose runs, built from the
- * services' Dockerfiles, so this also proves the images work. The test talks to the services only through their REST APIs, like a client
- * would, and then looks inside the databases and Kafka to check the outbox, the processed
- * events and the correlation ID.
+ * Runs against the shared {@link SystemEnvironment} (everything in Docker, using the images
+ * docker-compose runs) and calls order-service and inventory-service directly through their
+ * REST APIs, then looks inside the databases and Kafka to check the outbox, the processed
+ * events and the correlation ID. The gateway and security are covered by GatewaySystemTest.
  */
 @Testcontainers(disabledWithoutDocker = true)
 class OrderFlowSystemTest {
 
-    static {
-        // Same as the services' main(): PostgreSQL rejects legacy zone IDs such as "Asia/Calcutta".
-        TimeZoneNormalizer.normalizeDefault();
-    }
-
-    private static final Path REPO_ROOT = Path.of("..").toAbsolutePath().normalize();
-    private static final Network NETWORK = Network.newNetwork();
     private static final Duration SAGA_TIMEOUT = Duration.ofSeconds(30);
 
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16")
-            .withNetwork(NETWORK)
-            .withNetworkAliases("postgres")
-            .withUsername("postgres")
-            .withPassword("postgres")
-            // Same script docker-compose uses to create orderdb, ecommerce_product_db, ecommerce_inventory_db.
-            .withCopyFileToContainer(
-                    MountableFile.forHostPath(REPO_ROOT.resolve("docker/postgres/init.sql")),
-                    "/docker-entrypoint-initdb.d/init.sql");
-
-    @Container
-    static final KafkaContainer KAFKA = new KafkaContainer("apache/kafka:3.8.0")
-            .withNetwork(NETWORK)
-            .withNetworkAliases("kafka")
-            .withListener("kafka:19092");
-
-    @Container
-    static final GenericContainer<?> ORDER_SERVICE = service("order-service", 8080, "orderdb");
-
-    @Container
-    static final GenericContainer<?> INVENTORY_SERVICE = service("inventory-service", 8083, "ecommerce_inventory_db");
-
-    private static GenericContainer<?> service(String name, int port, String database) {
-        // Built from the service's Dockerfile by `docker compose build` (the pom runs it before the tests).
-        return new GenericContainer<>(DockerImageName.parse("ecommerce/" + name + ":latest"))
-                .withNetwork(NETWORK)
-                .withExposedPorts(port)
-                .withEnv("SPRING_DATASOURCE_URL", "jdbc:postgresql://postgres:5432/" + database)
-                .withEnv("SPRING_DATASOURCE_USERNAME", "postgres")
-                .withEnv("SPRING_DATASOURCE_PASSWORD", "postgres")
-                .withEnv("SPRING_KAFKA_BOOTSTRAP_SERVERS", "kafka:19092")
-                .withEnv("SPRING_JPA_SHOW_SQL", "false")
-                .dependsOn(POSTGRES, KAFKA)
-                .waitingFor(Wait.forHttp("/actuator/health").forPort(port).forStatusCode(200)
-                        .withStartupTimeout(Duration.ofMinutes(3)));
-    }
+    // The shared environment (SystemEnvironment) starts on first use, once for all test classes.
+    private static final PostgreSQLContainer<?> POSTGRES = SystemEnvironment.POSTGRES;
+    private static final KafkaContainer KAFKA = SystemEnvironment.KAFKA;
+    private static final GenericContainer<?> ORDER_SERVICE = SystemEnvironment.ORDER_SERVICE;
+    private static final GenericContainer<?> INVENTORY_SERVICE = SystemEnvironment.INVENTORY_SERVICE;
 
     private final HttpClient http = HttpClient.newHttpClient();
     private final ObjectMapper json = new ObjectMapper();
@@ -102,9 +54,7 @@ class OrderFlowSystemTest {
     /** Keep each service's log in target/ so a failure can be investigated. */
     @AfterAll
     static void saveServiceLogs() throws IOException {
-        Path dir = Files.createDirectories(Path.of("target", "system-test-logs"));
-        Files.writeString(dir.resolve("order-service.log"), ORDER_SERVICE.getLogs());
-        Files.writeString(dir.resolve("inventory-service.log"), INVENTORY_SERVICE.getLogs());
+        SystemEnvironment.saveLogs();
     }
 
     // ---------------------------------------------------------------------------------------
