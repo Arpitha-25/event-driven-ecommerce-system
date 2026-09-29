@@ -33,6 +33,7 @@
         <module>order-service</module>
         <module>product-service</module>
         <module>inventory-service</module>
+        <module>identity-service</module>
     </modules>
 
     <profiles>
