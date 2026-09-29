@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Build from the repository root, which has the parent POM and common-module:
-#   docker build -f product-service/Dockerfile -t ecommerce/product-service .
+#   docker build -f identity-service/Dockerfile -t ecommerce/identity-service .
 # (docker compose does this for you.)
 
 # ---- Build stage: compile the service with Maven inside Docker ----
@@ -16,19 +16,19 @@ COPY inventory-service/pom.xml inventory-service/
 COPY identity-service/pom.xml identity-service/
 COPY api-gateway/pom.xml api-gateway/
 COPY common-module/src common-module/src
-COPY product-service/src product-service/src
+COPY identity-service/src identity-service/src
 
 # The Maven repository is a BuildKit cache shared by all service images and all rebuilds,
 # so dependencies download once. Tests aren't compiled, so test-only libraries aren't needed.
 # "locked": parallel builds take turns, because a Maven repository isn't safe for concurrent writes.
 RUN --mount=type=cache,target=/root/.m2,sharing=locked \
-    mvn -B -q -pl product-service -am package -Dmaven.test.skip=true
+    mvn -B -q -pl identity-service -am package -Dmaven.test.skip=true
 
 # ---- Runtime stage: JRE only, non-root ----
 FROM eclipse-temurin:21-jre
 RUN groupadd --system app && useradd --system --gid app app
 WORKDIR /app
-COPY --from=build /workspace/product-service/target/product-service-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=build /workspace/identity-service/target/identity-service-0.0.1-SNAPSHOT.jar app.jar
 USER app
-EXPOSE 8082
+EXPOSE 8084
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]

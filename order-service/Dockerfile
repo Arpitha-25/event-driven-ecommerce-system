@@ -13,6 +13,8 @@ COPY common-module/pom.xml common-module/
 COPY order-service/pom.xml order-service/
 COPY product-service/pom.xml product-service/
 COPY inventory-service/pom.xml inventory-service/
+COPY identity-service/pom.xml identity-service/
+COPY api-gateway/pom.xml api-gateway/
 COPY common-module/src common-module/src
 COPY order-service/src order-service/src
 

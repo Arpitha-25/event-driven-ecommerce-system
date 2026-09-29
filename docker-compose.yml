@@ -1,7 +1,12 @@
-# The whole system: PostgreSQL, Kafka, Kafka UI and the three services.
+# The whole system: PostgreSQL, Kafka, Kafka UI, the API gateway, identity-service and the three
+# business services.
 #
-#   docker compose up -d --build                  # everything (first build takes a few minutes)
-#   docker compose up -d postgres kafka kafka-ui  # infrastructure only, to run services from the IDE / java -jar
+#   docker compose up -d --build                          # everything (first build takes a few minutes)
+#   docker compose up -d postgres db-init kafka kafka-ui  # infrastructure only, to run services from the IDE / java -jar
+#
+# Clients use the gateway: http://localhost:8000. The services' own ports are also published so
+# that development tools and the end-to-end scripts can reach them directly; in a real deployment
+# only the gateway would be exposed.
 #
 # Inside this network, containers reach Kafka at kafka:29092 and Postgres at postgres:5432.
 # From the host, use localhost:9092 and localhost:5432.
@@ -24,6 +29,21 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Creates any missing service database on every start (init.sql above only runs for a new
+  # volume), then exits. Services wait until it has finished successfully.
+  db-init:
+    image: postgres:16
+    container_name: ecommerce-db-init
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: postgres
+    volumes:
+      - ./docker/postgres/init.sql:/init.sql:ro
+    command: ["psql", "-h", "postgres", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-f", "/init.sql"]
+    restart: "no"
 
   kafka:
     image: apache/kafka:3.8.0
@@ -61,6 +81,43 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
 
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    image: ecommerce/api-gateway
+    container_name: ecommerce-api-gateway
+    depends_on:
+      - identity-service
+    ports:
+      - "8000:8000"
+    environment:
+      IDENTITY_SERVICE_URL: http://identity-service:8084
+      ORDER_SERVICE_URL: http://order-service:8080
+      PRODUCT_SERVICE_URL: http://product-service:8082
+      INVENTORY_SERVICE_URL: http://inventory-service:8083
+    restart: on-failure
+
+  identity-service:
+    build:
+      context: .
+      dockerfile: identity-service/Dockerfile
+    image: ecommerce/identity-service
+    container_name: ecommerce-identity-service
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ecommerce_identity_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      # Development-only admin account, created at startup if missing. Change it outside local development.
+      IDENTITY_ADMIN_EMAIL: admin@ecommerce.local
+      IDENTITY_ADMIN_PASSWORD: admin12345
+    restart: on-failure
+
   order-service:
     build:
       context: .
@@ -68,8 +125,8 @@ services:
     image: ecommerce/order-service
     container_name: ecommerce-order-service
     depends_on:
-      postgres:
-        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
       kafka:
         condition: service_healthy
     ports:
@@ -88,8 +145,8 @@ services:
     image: ecommerce/product-service
     container_name: ecommerce-product-service
     depends_on:
-      postgres:
-        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
       kafka:
         condition: service_healthy
     ports:
@@ -108,8 +165,8 @@ services:
     image: ecommerce/inventory-service
     container_name: ecommerce-inventory-service
     depends_on:
-      postgres:
-        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
       kafka:
         condition: service_healthy
     ports:
