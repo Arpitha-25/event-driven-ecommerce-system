@@ -5,9 +5,15 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/orderdb}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+  flyway:
+    # Adopt a database created before Flyway (by ddl-auto: update) as version 1 instead of failing.
+    # V1 is identical to that schema, so nothing is re-created. An empty database runs V1 normally.
+    baseline-on-migrate: true
+    baseline-version: 1
   jpa:
     hibernate:
-      ddl-auto: update
+      # The schema is owned by Flyway (db/migration); Hibernate only checks the entities match it.
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
