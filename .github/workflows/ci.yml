@@ -33,6 +33,10 @@ jobs:
       - name: Build and test
         run: ./mvnw -B -ntp verify
 
+      # Fails if any test was skipped (e.g. Testcontainers without Docker) or none ran.
+      - name: Check test counts
+        run: python3 .github/scripts/test-summary.py "Unit and integration tests"
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
@@ -65,6 +69,9 @@ jobs:
       # and drives the order saga through the REST APIs.
       - name: Build images and run the system test
         run: ./mvnw -B -ntp -Psystem-tests -pl system-tests verify
+
+      - name: Check test counts
+        run: python3 .github/scripts/test-summary.py "System test"
 
       - name: Upload service logs
         if: failure()
