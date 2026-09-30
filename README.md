@@ -1,12 +1,13 @@
 # 🛒 Event-Driven E-Commerce Platform
 
-> An event-driven microservices backend built with **Java 21, Spring Boot 3, Spring Cloud Gateway, Spring Security, Apache Kafka, PostgreSQL and Docker**.
+> An event-driven microservices backend built with **Java 21, Spring Boot 3, Spring Cloud Gateway, Spring Security, Apache Kafka, PostgreSQL, Redis and Docker**.
 
 [![CI](https://github.com/Arpitha-25/event-driven-ecommerce-system/actions/workflows/ci.yml/badge.svg)](https://github.com/Arpitha-25/event-driven-ecommerce-system/actions/workflows/ci.yml)
 ![Java](https://img.shields.io/badge/Java-21-orange)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-brightgreen)
 ![Apache Kafka](https://img.shields.io/badge/Apache-Kafka-black)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
 
 ---
@@ -15,12 +16,13 @@
 
 Clients reach the system through a single **API gateway**, which checks every request's **JWT access token** (issued by the identity service) and routes it to the right service. Each service has its own PostgreSQL database and REST API.
 
-Order and Inventory services coordinate order fulfillment through a **choreography-based saga over Apache Kafka**: an order is confirmed only after inventory reserves its stock, and cancelling an order releases that stock. Order events are published through a **Transactional Outbox**, so an order and its event are always saved together, even while Kafka is down. Product Service publishes catalog events. A shared `common-module` provides the API response format, base event model, exceptions and utilities used by the services.
+Order and Inventory services coordinate order fulfillment through a **choreography-based saga over Apache Kafka**: an order is confirmed only after inventory reserves its stock, and cancelling an order releases that stock. Order events are published through a **Transactional Outbox**, so an order and its event are always saved together, even while Kafka is down. Product Service publishes catalog events and serves product reads from a **Redis cache**. A shared `common-module` provides the API response format, base event model, exceptions and utilities used by the services.
 
 ![Architecture](docs/architecture.png)
 
 📄 Design, failure handling and test results:
 - [docs/GATEWAY-AND-AUTH.md](docs/GATEWAY-AND-AUTH.md): the API gateway, the identity service and JWT authentication
+- [docs/REDIS-CACHE.md](docs/REDIS-CACHE.md): the Redis cache for product reads, with measured latency
 - [docs/ORDER-INVENTORY-SAGA.md](docs/ORDER-INVENTORY-SAGA.md): the order → inventory saga
 - [docs/TRANSACTIONAL-OUTBOX.md](docs/TRANSACTIONAL-OUTBOX.md): reliable event publishing from order-service
 - [docs/RELIABLE-CONSUMERS.md](docs/RELIABLE-CONSUMERS.md): idempotent consumers, retries and dead-letter topics
@@ -42,8 +44,8 @@ Order and Inventory services coordinate order fulfillment through a **choreograp
          ┌─────────────────────────┼─────────────────────────┐
          ▼                         ▼                         ▼
    Order Service            Product Service           Inventory Service
-      (:8080)                   (:8082)                    (:8083)
-         │                         │                         │
+      (:8080)                   (:8082) ──► Redis          (:8083)
+         │                         │     (product cache)     │
          ▼                         ▼                         ▼
       orderdb             ecommerce_product_db      ecommerce_inventory_db
          │                         │                         │
@@ -80,7 +82,7 @@ DELETE /orders/{id} ──► Order CANCELLED + outbox row
 | API Gateway | Single entry point: routing, JWT verification, access rules, verified `X-User-*` headers, correlation IDs | — |
 | Identity Service | Accounts (BCrypt), login, RS256-signed access tokens, public keys (JWKS) | — |
 | Order Service | Create, read, update and cancel orders; confirms or rejects orders based on inventory's reply | Publishes order events; consumes inventory events |
-| Product Service | Product catalog management | Publishes product events |
+| Product Service | Product catalog management; product reads cached in Redis | Publishes product events |
 | Inventory Service | Stock levels per product; reserves stock for new orders and releases it for cancelled ones | Consumes order events; publishes inventory events |
 | Common Module | Shared DTOs, base event, event metadata, exceptions, correlation ID filter, utilities | — |
 
@@ -128,6 +130,7 @@ Every consumer records the event IDs it has handled (`processed_events`), so a r
 - JWT authentication: RS256 tokens from a dedicated identity service, verified at the gateway against published public keys (JWKS); role-based access rules (USER / ADMIN)
 - The gateway strips client-supplied `X-User-*` headers and adds verified `X-User-Id` / `X-User-Roles`, so identity can't be spoofed
 - BCrypt password hashing; login doesn't reveal which emails are registered
+- Redis cache for product reads (`@Cacheable`, evicted by `@CacheEvict` after the update or delete commits); falls back to PostgreSQL if Redis is down
 - Choreography-based saga between Order and Inventory services
 - Transactional Outbox: order events saved atomically with the order and published by a scheduled relay (`FOR UPDATE SKIP LOCKED`, ordered, retried, at-least-once)
 - Idempotent consumers: every listener records processed event IDs in the same transaction as its work (`INSERT … ON CONFLICT DO NOTHING`), backed by reservations keyed by order ID and order-status guards
@@ -152,7 +155,7 @@ Every consumer records the event IDs it has handled (`processed_events`), so a r
 | Language & framework | Java 21, Spring Boot 3.3 (Web, WebFlux, Data JPA, Validation, Actuator) |
 | Gateway & security | Spring Cloud Gateway, Spring Security (OAuth2 resource server), Nimbus JOSE + JWT, BCrypt |
 | Messaging | Apache Kafka 3.8, Spring Kafka, Kafka UI |
-| Database | PostgreSQL 16, Flyway migrations |
+| Database & cache | PostgreSQL 16, Flyway migrations, Redis 7 (Spring Cache) |
 | Mapping & boilerplate | MapStruct, Lombok |
 | API docs | springdoc-openapi (Swagger UI) |
 | Testing | JUnit 5, Mockito, Spring Boot Test, Testcontainers (PostgreSQL, Kafka), MockWebServer |
@@ -211,7 +214,7 @@ A development admin account is created from `docker-compose.yml` (`admin@ecommer
 **Prerequisites:** Java 21, Maven and Docker.
 
 ```bash
-docker compose up -d postgres db-init kafka kafka-ui   # infrastructure only
+docker compose up -d postgres db-init kafka kafka-ui redis   # infrastructure only
 mvn clean install                                      # unit and integration tests (Testcontainers needs Docker)
 
 java -jar identity-service/target/identity-service-0.0.1-SNAPSHOT.jar    # :8084
@@ -248,6 +251,7 @@ powershell -ExecutionPolicy Bypass -File scripts\test-gateway-auth.ps1        # 
 powershell -ExecutionPolicy Bypass -File scripts\test-order-saga.ps1
 powershell -ExecutionPolicy Bypass -File scripts\test-reliable-consumers.ps1
 powershell -ExecutionPolicy Bypass -File scripts\test-outbox-kafka-outage.ps1   # stops Kafka for about a minute
+powershell -ExecutionPolicy Bypass -File scripts\measure-product-cache.ps1        # product read latency, cache on vs off
 ```
 
 Services connect to `localhost` with `postgres` / `postgres` credentials by default. Override them with
