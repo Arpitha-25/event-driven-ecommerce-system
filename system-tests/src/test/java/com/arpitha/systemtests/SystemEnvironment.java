@@ -51,9 +51,15 @@ final class SystemEnvironment {
             .withNetworkAliases("kafka")
             .withListener("kafka:19092");
 
+    static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine")
+            .withNetwork(NETWORK)
+            .withNetworkAliases("redis")
+            .withExposedPorts(6379);
+
     static final GenericContainer<?> ORDER_SERVICE = service("order-service", 8080, "orderdb", Map.of());
     static final GenericContainer<?> INVENTORY_SERVICE = service("inventory-service", 8083, "ecommerce_inventory_db", Map.of());
-    static final GenericContainer<?> PRODUCT_SERVICE = service("product-service", 8082, "ecommerce_product_db", Map.of());
+    static final GenericContainer<?> PRODUCT_SERVICE = service("product-service", 8082, "ecommerce_product_db", Map.of(
+            "SPRING_DATA_REDIS_HOST", "redis"));
     static final GenericContainer<?> IDENTITY_SERVICE = service("identity-service", 8084, "ecommerce_identity_db", Map.of(
             "IDENTITY_ADMIN_EMAIL", ADMIN_EMAIL,
             "IDENTITY_ADMIN_PASSWORD", ADMIN_PASSWORD));
@@ -72,6 +78,7 @@ final class SystemEnvironment {
     static {
         POSTGRES.start();
         KAFKA.start();
+        REDIS.start();
         // The services are independent of each other at startup, so start them in parallel.
         Startables.deepStart(ORDER_SERVICE, INVENTORY_SERVICE, PRODUCT_SERVICE, IDENTITY_SERVICE, API_GATEWAY).join();
     }
