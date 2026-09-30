@@ -2,7 +2,7 @@
 # business services.
 #
 #   docker compose up -d --build                          # everything (first build takes a few minutes)
-#   docker compose up -d postgres db-init kafka kafka-ui  # infrastructure only, to run services from the IDE / java -jar
+#   docker compose up -d postgres db-init kafka kafka-ui redis  # infrastructure only, to run services from the IDE / java -jar
 #
 # Clients use the gateway: http://localhost:8000. The services' own ports are also published so
 # that development tools and the end-to-end scripts can reach them directly; in a real deployment
@@ -16,6 +16,7 @@ services:
   postgres:
     image: postgres:16
     container_name: ecommerce-postgres
+    mem_limit: 512m
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -48,6 +49,7 @@ services:
   kafka:
     image: apache/kafka:3.8.0
     container_name: ecommerce-kafka
+    mem_limit: 768m
     ports:
       - "9092:9092"
     environment:
@@ -63,16 +65,34 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      # The check runs its own small JVM; give it a small heap, not the broker's KAFKA_HEAP_OPTS.
+      test: ["CMD-SHELL", "KAFKA_HEAP_OPTS=-Xmx64m /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
       interval: 10s
       timeout: 10s
       retries: 12
-      start_period: 15s
+      start_period: 60s
+
+  # Cache for product reads (product-service). Data isn't persisted: it's only a cache.
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce-redis
+    mem_limit: 128m
+    # A cache only: at 64 MB, drop the least recently used keys instead of failing writes.
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: ecommerce-kafka-ui
+    mem_limit: 384m
     depends_on:
       - kafka
     ports:
@@ -80,6 +100,7 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      JAVA_OPTS: "-XX:MaxRAMPercentage=75"
 
   api-gateway:
     build:
@@ -87,6 +108,8 @@ services:
       dockerfile: api-gateway/Dockerfile
     image: ecommerce/api-gateway
     container_name: ecommerce-api-gateway
+    # The JVM sizes its heap to 75% of this limit (-XX:MaxRAMPercentage=75 in the Dockerfile).
+    mem_limit: 640m
     depends_on:
       - identity-service
     ports:
@@ -104,6 +127,8 @@ services:
       dockerfile: identity-service/Dockerfile
     image: ecommerce/identity-service
     container_name: ecommerce-identity-service
+    # The JVM sizes its heap to 75% of this limit (-XX:MaxRAMPercentage=75 in the Dockerfile).
+    mem_limit: 640m
     depends_on:
       db-init:
         condition: service_completed_successfully
@@ -124,6 +149,8 @@ services:
       dockerfile: order-service/Dockerfile
     image: ecommerce/order-service
     container_name: ecommerce-order-service
+    # The JVM sizes its heap to 75% of this limit (-XX:MaxRAMPercentage=75 in the Dockerfile).
+    mem_limit: 640m
     depends_on:
       db-init:
         condition: service_completed_successfully
@@ -144,10 +171,14 @@ services:
       dockerfile: product-service/Dockerfile
     image: ecommerce/product-service
     container_name: ecommerce-product-service
+    # The JVM sizes its heap to 75% of this limit (-XX:MaxRAMPercentage=75 in the Dockerfile).
+    mem_limit: 640m
     depends_on:
       db-init:
         condition: service_completed_successfully
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "8082:8082"
@@ -156,6 +187,10 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_DATA_REDIS_HOST: redis
+      # redis (default) or none; PRODUCT_CACHE_TYPE=none turns the cache off, e.g. for a latency comparison.
+      SPRING_CACHE_TYPE: ${PRODUCT_CACHE_TYPE:-redis}
+      SPRING_JPA_SHOW_SQL: "false"
     restart: on-failure
 
   inventory-service:
@@ -164,6 +199,8 @@ services:
       dockerfile: inventory-service/Dockerfile
     image: ecommerce/inventory-service
     container_name: ecommerce-inventory-service
+    # The JVM sizes its heap to 75% of this limit (-XX:MaxRAMPercentage=75 in the Dockerfile).
+    mem_limit: 640m
     depends_on:
       db-init:
         condition: service_completed_successfully
