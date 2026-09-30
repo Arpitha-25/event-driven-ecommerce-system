@@ -1,5 +1,6 @@
 package com.arpitha.product_service.service.impl;
 
+import com.arpitha.product_service.config.CacheConfig;
 import com.arpitha.product_service.domain.enums.ProductStatus;
 import com.arpitha.product_service.dto.CreateProductRequest;
 import com.arpitha.product_service.dto.ProductResponse;
@@ -16,6 +17,8 @@ import com.arpitha.product_service.service.ProductService;
 import com.arpitha.product_service.event.mapper.ProductEventMapper;
 import com.arpitha.product_service.event.publisher.ProductEventPublisher;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -77,8 +80,10 @@ public class ProductServiceImpl implements ProductService {
         return productMapper.toResponse(savedProduct);
     }
 
+    /** Served from Redis after the first read; a missing product is not cached. */
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheConfig.PRODUCTS, key = "#id")
     public ProductResponse getProductById(UUID id) {
         log.info("Fetching product with ID: {}", id);
         Product product = findProductById(id);
@@ -93,8 +98,10 @@ public class ProductServiceImpl implements ProductService {
                 .map(productMapper::toSummaryResponse);
     }
 
+    /** Removes the cached copy once the update has committed. */
     @Override
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.PRODUCTS, key = "#id")
     public ProductResponse updateProduct(UUID id, UpdateProductRequest request) {
         log.info("Updating product with ID: {}", id);
         Product product = findProductById(id);
@@ -133,8 +140,10 @@ public class ProductServiceImpl implements ProductService {
         return productMapper.toResponse(updatedProduct);
     }
 
+    /** Removes the cached copy once the delete (marking it discontinued) has committed. */
     @Override
     @Transactional
+    @CacheEvict(cacheNames = CacheConfig.PRODUCTS, key = "#id")
     public void deleteProduct(UUID id) {
         log.info("Deleting product with ID: {}", id);
         Product product = findProductById(id);

@@ -26,8 +26,20 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  cache:
+    # Product reads are cached in Redis (see CacheConfig). SPRING_CACHE_TYPE=none turns caching off.
+    type: redis
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      # Short timeouts: if Redis is unavailable, reads fall back to PostgreSQL quickly.
+      timeout: 500ms
+      connect-timeout: 500ms
 
 app:
+  cache:
+    product-ttl: 10m
   kafka:
     topics:
       product-created: product.created.v1
@@ -42,3 +54,8 @@ management:
   endpoint:
     health:
       show-details: always
+  health:
+    redis:
+      # The cache is optional: reads fall back to PostgreSQL, so a Redis outage must not
+      # mark the whole service as down.
+      enabled: false
